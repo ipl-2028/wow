@@ -1,0 +1,238 @@
+/*-------------------------------------------------
+  Ex 1: LED Blink
+-------------------------------------------------*/
+void setup() {
+  pinMode(3, OUTPUT);
+  pinMode(7, OUTPUT);
+  pinMode(11, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  digitalWrite(3, HIGH); delay(1000);
+  digitalWrite(3, LOW);  delay(1000);
+  digitalWrite(7, HIGH); delay(1000);
+  digitalWrite(7, LOW);  delay(1000);
+  digitalWrite(11, HIGH); delay(1000);
+  digitalWrite(11, LOW);  delay(1000);
+}
+
+/*-------------------------------------------------
+  Ex 2: Analog Sensor
+-------------------------------------------------*/
+#define SENSOR_PIN A0
+
+void setup2() {
+  Serial.begin(9600);
+}
+
+void loop2() {
+  int analogValue = analogRead(SENSOR_PIN);
+  float voltage = analogValue * (5.0 / 1023.0);
+  float temperature = voltage * 100.0;
+
+  Serial.print("Analog value: ");
+  Serial.print(analogValue);
+  Serial.print(" | Temperature (C): ");
+  Serial.println(temperature);
+  delay(1000);
+}
+
+/*-------------------------------------------------
+  Ex 3: Servo Motor
+-------------------------------------------------*/
+#include <Servo.h>
+Servo myservo;
+int potpin = A0;
+int val;
+
+void setup3() {
+  myservo.attach(9);
+}
+
+void loop3() {
+  val = analogRead(potpin);
+  val = map(val, 0, 1023, 0, 180);
+  myservo.write(val);
+  delay(15);
+}
+
+/*-------------------------------------------------
+  Ex 4: UART Communication
+-------------------------------------------------*/
+// --- Transmitter ---
+void setup4_Tx() {
+  Serial.begin(9600);
+}
+
+void loop4_Tx() {
+  Serial.println("Hello from Arduino 1!");
+  delay(1000);
+}
+
+// --- Receiver ---
+String receivedData = "";
+
+void setup4_Rx() {
+  Serial.begin(9600);
+  Serial.println("Arduino 2 Ready to Receive...");
+}
+
+void loop4_Rx() {
+  if (Serial.available() > 0) {
+    receivedData = Serial.readStringUntil('\n');
+    Serial.print("Received: ");
+    Serial.println(receivedData);
+  }
+}
+
+/*-------------------------------------------------
+  Ex 5: HTTP Request (ESP32)
+-------------------------------------------------*/
+#include <WiFi.h>
+#include <HTTPClient.h>
+
+const char* ssid = "Wokwi-GUEST";
+const char* password = "";
+const char* serverName = "http://httpbin.org/get";
+
+void setup5() {
+  Serial.begin(115200);
+  delay(1000);
+
+  Serial.println("Connecting to WiFi...");
+  WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("\nConnected to WiFi");
+
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    http.begin(serverName);
+    int httpResponseCode = http.GET();
+
+    if (httpResponseCode > 0) {
+      Serial.print("HTTP Response code: ");
+      Serial.println(httpResponseCode);
+      String payload = http.getString();
+      Serial.println("Response:");
+      Serial.println(payload);
+    } else {
+      Serial.print("Error code: ");
+      Serial.println(httpResponseCode);
+    }
+    http.end();
+  }
+}
+
+void loop5() {}
+
+/*-------------------------------------------------
+  Ex 6: Interfacing with PC (Ultrasonic + LCD)
+-------------------------------------------------*/
+#include <Adafruit_LiquidCrystal.h>
+
+#define trigPin 2
+#define echoPin 3
+
+long duration;
+int distance;
+Adafruit_LiquidCrystal lcd_1(0);
+
+void setup6() {
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+  Serial.begin(9600);
+  lcd_1.begin(16, 2);
+  lcd_1.print("Sensor Value :");
+}
+
+void loop6() {
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(5);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  duration = pulseIn(echoPin, HIGH);
+  distance = duration * 0.034 / 2;
+
+  lcd_1.setCursor(0, 1);
+  lcd_1.print(distance);
+  lcd_1.print("cm   ");
+  delay(50);
+}
+
+/*-------------------------------------------------
+  Ex 7: Multitasking (ESP32)
+-------------------------------------------------*/
+#include <Arduino.h>
+
+int sensorValue = 0;
+
+void TaskReadSensor(void *pvParameters) {
+  while (1) {
+    sensorValue = analogRead(34);
+    vTaskDelay(500 / portTICK_PERIOD_MS);
+  }
+}
+
+void TaskDisplay(void *pvParameters) {
+  while (1) {
+    Serial.print("Potentiometer Value: ");
+    Serial.println(sensorValue);
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+  }
+}
+
+void setup7() {
+  Serial.begin(115200);
+  xTaskCreate(TaskReadSensor, "ReadSensor", 1000, NULL, 1, NULL);
+  xTaskCreate(TaskDisplay, "Display", 1000, NULL, 1, NULL);
+}
+
+void loop7() {}
+
+/*-------------------------------------------------
+  Ex 8: Bluetooth (ESP32 BLE)
+-------------------------------------------------*/
+#include <BLEDevice.h>
+#include <BLEServer.h>
+#include <BLEUtils.h>
+
+bool connected = false;
+
+class MyCallbacks : public BLEServerCallbacks {
+  void onConnect(BLEServer *pServer) { connected = true; }
+  void onDisconnect(BLEServer *pServer) { connected = false; }
+};
+
+void setup8() {
+  Serial.begin(115200);
+  BLEDevice::init("ESP32-BLE");
+
+  BLEServer *server = BLEDevice::createServer();
+  server->setCallbacks(new MyCallbacks());
+
+  BLEService *service = server->createService("1234");
+
+  BLECharacteristic *charac = service->createCharacteristic(
+    "5678",
+    BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE
+  );
+
+  charac->setValue("Hello from ESP32");
+  service->start();
+  server->getAdvertising()->start();
+
+  Serial.println("BLE advertising started...");
+}
+
+void loop8() {
+  Serial.println(connected ? "Device connected" : "Waiting for device...");
+  delay(2000);
+}
